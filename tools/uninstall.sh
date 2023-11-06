@@ -32,6 +32,8 @@ uninstall() {
   echo -e "$ansi_green Deleting system links... $ansi_std"
   rm -f /opt/bin/ss-merlin
   rm -f /opt/bin/v2ray-plugin
+  rm -f /opt/bin/clash
+  rm -f /opt/etc/init.d/S90clash
 
   echo -e "$ansi_green Cleaning dnsmasq configuration file... $ansi_std"
   sed -i "\#conf-dir=${SS_MERLIN_HOME}/etc/dnsmasq.d/,\*\.conf#d" /jffs/configs/dnsmasq.conf.add 2>/dev/null

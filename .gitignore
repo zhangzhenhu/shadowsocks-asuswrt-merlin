@@ -6,3 +6,4 @@ etc/ss-merlin.conf
 rules/
 !rules/localips
 tools/do_upgrade.sh
+.DS_Store

@@ -1,5 +1,47 @@
 # Shadowsocks for Asuswrt-Merlin New Gen
 
+
+部分站点跳转到 lighttpd ，然后由 lighttpd 进行302跳转
+
+```sh
+opkg update
+opkg upgrade
+opkg install  wget-ssl lighttpd
+```
+安装完成后，默认 `lighttpd` 的配置文件在目录 `/opt/etc/lighttpd/` ，
+
+`lighttpd` 服务的启动停止操作脚本是
+
+```sh
+ /opt/etc/init.d/S80lighttpd
+
+```
+
+配置文件修改
+
+302 跳转规则修改，在文件 `/opt/etc/lighttpd/conf.d/10-redirect.conf` 增加一下内容
+
+```
+server.modules += ( "mod_redirect" )
+$HTTP["host"] =~ "^(assets1|assets2|d1|d2|xvcf1|xvcf2)\.xboxlive\.com$" {
+    url.redirect = ( "(.*)" => "http://assets1.xboxlive.cn$1" )
+}
+$HTTP["host"] =~ "^(dlassets|dlassets2)\.xboxlive\.com$" {
+    url.redirect = ( "(.*)" => "http://dlassets.xboxlive.cn$1" )
+}
+
+```
+
+在文件 `/opt/etc/lighttpd/conf.d/30-proxy.conf` 增加以下内容
+
+```
+server.modules += ( "mod_proxy" )
+proxy.server = ( "" => (( "host" => "127.0.0.1", "port" => 7890    )))
+
+```
+
+
+
 shadowsocks-asuswrt-merlin will install `shadowsocks-libev` and `v2ray-plugin` on your Asuswrt-Merlin New Gen(version 382.xx and higher) based router, tested on NETGEAR R7000 and ASUS RT-AC86U.
 
 For server side set up, you can easily install shadowsocks server and v2ray-plugin with docker by [https://github.com/Acris/docker-shadowsocks-libev](https://github.com/Acris/docker-shadowsocks-libev).

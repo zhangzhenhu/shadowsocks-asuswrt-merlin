@@ -58,6 +58,7 @@ install() {
 
   echo -e "$ansi_green Creating system links... $ansi_std"
   ln -sf ${SS_MERLIN_HOME}/bin/ss-merlin /opt/bin/ss-merlin
+  ln -sf ${SS_MERLIN_HOME}/bin/clash /opt/bin/clash
   ln -sf ${SS_MERLIN_HOME}/bin/v2ray-plugin /opt/bin/v2ray-plugin
 
   echo -e "$ansi_green Creating dnsmasq config file... $ansi_std"
@@ -69,6 +70,7 @@ install() {
   # Remove default start script
   rm -f /opt/etc/init.d/S22shadowsocks 2>/dev/null
   rm -f /opt/etc/init.d/S61unbound 2>/dev/null
+  cp ${SS_MERLIN_HOME}/bin/S90clash /opt/etc/init.d/
 
   # Remove default configutation files
   rm -rf /opt/etc/shadowsocks 2>/dev/null

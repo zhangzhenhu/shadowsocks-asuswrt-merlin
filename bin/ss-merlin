@@ -79,6 +79,8 @@ start_proxy() {
     user_domain_name_whitelist=${SS_MERLIN_HOME}/rules/user_domain_name_whitelist.txt
     user_domain_name_blocklist=${SS_MERLIN_HOME}/rules/user_domain_name_blocklist.txt
     user_domain_name_gfwlist=${SS_MERLIN_HOME}/rules/user_domain_name_gfwlist.txt
+    # 需要跳转到 lighttpd 的域名
+    user_domain_name_302list=${SS_MERLIN_HOME}/rules/user_302_redirect.txt
 
     OLDIFS="$IFS" && IFS=$'\n'
     if [[ -f ${user_domain_name_whitelist} ]]; then
@@ -103,8 +105,24 @@ start_proxy() {
         sed -i "/server=\/${i}\/.*/d" ${GOOGLE_CONFIG}
         sed -i "/server=\/${i}\/.*/d" ${APPLE_CONFIG}
         echo "ipset=/${i}/usergfwlist" >>${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
+        
+        if [[ -n "${safe_dns_ip}" ]]; then
+          # 封禁的站点 用 指定的 dns 服务进行域名解析，避免 dns 污染
+          echo "server=/${i}/${safe_dns_ip}" >>${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
+        fi
       done
     fi
+
+    if [[ -f ${user_domain_name_302list} ]]; then
+      for i in $(cat ${user_domain_name_302list} | grep -v '^#'); do
+        # 写到 user-gfwlist-domains.conf 这个文件， 就不用再创建新的文件了
+        # 注意，这里的作用是，告知 dnsmasq  名单里的域名解析得到的 ip 加入到名字为 user302list 的 ipset 集合 
+        # 在 iptables 规则里会把这个集合里的数据包强制转发发到 lighttpd 服务
+        echo "ipset=/${i}/user302list" >> ${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
+
+      done
+    fi
+
     IFS=${OLDIFS}
   fi
 
@@ -135,7 +153,7 @@ start_proxy() {
   cru a update-ip-whitelist "15 2 * * *" "$SS_MERLIN_HOME/scripts/update_ip_whitelist.sh"
   cru a update-dns-whitelist "15 3 * * *" "$SS_MERLIN_HOME/scripts/update_dns_whitelist.sh"
   cru a update-gfwlist "15 4 * * *" "$SS_MERLIN_HOME/scripts/update_gfwlist.sh"
-  cru a upgrade-ss-merlin "20 6 * * *" "$SS_MERLIN_HOME/tools/upgrade.sh"
+  # cru a upgrade-ss-merlin "20 6 * * *" "$SS_MERLIN_HOME/tools/upgrade.sh"
 
   touch /tmp/ss-merlin-is-run
 
