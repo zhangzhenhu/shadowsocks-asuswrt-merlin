@@ -22,7 +22,12 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 我的路由器是华硕 AX86U 路由器，Armv8 架构，并且刷了原版梅林（merlin）固件，因为不太信任国内团队搞得改版梅林，所以还是用的原版梅林。
 原版梅林安装插件就比较麻烦了，找了很久后选中了 ``Shadowsocks for Asuswrt-Merlin New Gen`` 这个项目。
 
+学习资料：
 
+https://blog.gmem.cc/iptables
+
+
+### 思路
 
 但这个项目也有一点不足，就是它用的 ``Shadowsocks ss-redir`` 做透明代理服务，
 使用 ``ss-redir`` 会有几个不足：
@@ -186,7 +191,8 @@ clash 的默认安装目录在 ``${SS_MERLIN_HOME}/clash`` ,
 
 我去掉了对 路由器 本身流量进行透明代理的功能，
 首先，这个功能没有太完美的处理方式，经常容易出错，造成困扰。
-其次，感觉这个就是伪需求，路由器 本身流量
+其次，感觉这个就是伪需求，路由器本身流量没必要增加透明代理，基本上不需要到路由器上干啥。
+即使需要，手动通过环境变量（http_proxy,https_proxy,all_proxy）设置一下代理即可。
 
 
 
