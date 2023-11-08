@@ -30,6 +30,7 @@ modprobe xt_set
 # Create ipset for user domain name whitelist and user domain name gfwlist
 ipset create userwhitelist hash:net 2>/dev/null
 ipset create usergfwlist hash:net 2>/dev/null
+ipset create user302list hash:net 2>/dev/null
 
 
 if [[ ${mode} -eq 0 ]]; then
@@ -287,7 +288,7 @@ iptables -t mangle -F TPROXY_TCP 2>/dev/null
 
 # 应用 302 跳转的规则
 # 创建一个针对 302 的ipset， dnsmasq 负责把ip写入这个 set
-ipset create user302list hash:net 2>/dev/null
+# ipset create user302list hash:net 2>/dev/null
 # iptables -t nat -N USER302  
 # iptables -t nat -A PREROUTING  -p tcp  -j USER302
 # 需要 302 的转给 lighttpd_port
