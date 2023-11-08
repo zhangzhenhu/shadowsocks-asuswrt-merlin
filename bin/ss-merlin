@@ -119,6 +119,11 @@ start_proxy() {
         # 注意，这里的作用是，告知 dnsmasq  名单里的域名解析得到的 ip 加入到名字为 user302list 的 ipset 集合 
         # 在 iptables 规则里会把这个集合里的数据包强制转发发到 lighttpd 服务
         echo "ipset=/${i}/user302list" >> ${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
+        
+        if [[ -n "${safe_dns_ip}" ]]; then
+          # 为避免这部分域名被 dns 污染，可以指定这部分域名使用安全的 dns 解析
+          echo "server=/${i}/${safe_dns_ip}" >>${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
+        fi
 
       done
     fi

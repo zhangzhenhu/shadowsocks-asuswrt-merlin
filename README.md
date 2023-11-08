@@ -7,19 +7,19 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 
 ## 变更说明
 
-关键词： xbox,华硕,代理,clash,加速
+关键词： xbox,华硕,代理,clash,加速,xbox加速
 
 本项目基于 ``Shadowsocks for Asuswrt-Merlin New Gen`` 修改而来。
 
 ### 背景说明
 
-最近 ``xbox`` 总抽风，所以想着给他加个代理，但是 xbox 本身不支持配置代理，只能想办法在路由器上加一个透明代理。
+最近 ``xbox`` 总抽风，所以想着给他加个代理，但是 ``xbox`` 本身不支持配置代理，只能想办法在路由器上加一个透明代理。
 但是如果把 ``xbox`` 全部请求都走代理，游戏下载速度会超级慢。
 参考学习了 ``xbox`` 下载助手（https://github.com/skydevil88/XboxDownload/blob/master/README_OpenWrt.md）
-的知识，部分游戏下载链接可以利用302跳转到国内站，其它 xbox 地址的走代理。
+的知识，部分游戏下载链接可以利用302跳转到国内站，其它 ``xbox`` 地址的走代理。
 这样就两全其美了，但是要实现起来比较麻烦。
 
-我的路由器是华硕路由器，并且刷了原版梅林（merlin）固件，因为不太信任国内团队搞得改版梅林，所以还是用的原版梅林。
+我的路由器是华硕 AX86U 路由器，Armv8 架构，并且刷了原版梅林（merlin）固件，因为不太信任国内团队搞得改版梅林，所以还是用的原版梅林。
 原版梅林安装插件就比较麻烦了，找了很久后选中了 ``Shadowsocks for Asuswrt-Merlin New Gen`` 这个项目。
 
 
@@ -29,7 +29,7 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 
 1. ``ss-redir`` 只能传入一个代理地址，不能传入多个并自己选择最优的。
 2. ``ss-redir`` 只能提供透明代理，不能同时提供 http 代理和 sockets 代理，这很不方便，不能很好的和 ``lighttpd`` 做配合。
-   ``lighttpd`` 需要依赖一个 http 代理，之后会讲到为什么。
+   ``lighttpd`` 需要依赖一个 http 代理，之后会讲到为什么需要 ``lighttpd`` 。
 
 鉴于以上，想把 ``ss-redir`` 替换成功能更强大的 ``clash``。
 
@@ -45,7 +45,7 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 所以又找到 ``lighttpd``,利用 ``lighttpd`` 做302跳转。
 
 但并不是 ``xbox`` 的全部链接都要 302 跳转，
-那些不需要跳转的的链接还得转回到代理才行，
+那些不需要跳转的的链接还得转发到代理才行，
 ``lighttpd`` 有个插件可以转发流量到代理服务，
 但这个插件只支持 ``http`` 代理，因此还得需要一个 ``http`` 代理服务，
 这时就体现出 ``clash`` 功能丰富了，``clash``
@@ -55,14 +55,14 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 
 大概的方案：
 
-1. 路由器利用 dnsmasq 进行dns解析，并且自动写相应的 ipset。为什么要用 dnsmasq 下面会讲。
-2. 利用 iptables 进行流量分流
-  1. 需要 302 跳转的 xbox 下载链接的域名流量，直接转发到 ``lighttpd``。
+1. 路由器利用 ``dnsmasq`` 进行 dns 解析，并且自动写相应的 ``ipset`` 。为什么要用 ``dnsmasq`` 下面会讲。
+2. 利用 ``iptables`` 进行流量分流
+  1. 需要 302 跳转的 ``xbox`` 下载链接所属域名流量，直接转发到 ``lighttpd``。
   2. 需要走透明代理的的流量，转发到 ``clash``。
   3. 其它的直连。
 
-3. 需要 302 跳转的域名流量被转到 ``lighttpd``， ``lighttpd`` 根据正则规则进行 302 调整。
-   命中调整规则的直接返回 302 给 ``xbox`` 了 ，没有命中的，转发给 ``clash`` 提供的 http代理服务。
+3. 需要 302 跳转的域名流量被转到 ``lighttpd``， ``lighttpd`` 根据正则规则进行 302 跳转。
+   命中跳转规则的直接返回 302 给 ``xbox`` 了 ，没有命中的，转发给 ``clash`` 提供的 ``http`` 代理服务。
 4. 
 
 
@@ -71,7 +71,7 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 我们知道， ``clash`` 也可以分流，但是  ``clash`` 是分走代理还是直连，不能分流给 ``lighttpd``。
 所以我们还得选择用 ``iptables`` 进行分流。
 
-``iptables`` 分流只能按照 ip 分流，不能安装域名分流，但 ``iptables`` 可以和 ``ipset`` 配合使用，
+``iptables`` 分流只能按照 ip 分流，不能按照域名分流，但 ``iptables`` 可以和 ``ipset`` 配合使用，
 利用 ``ipset`` 进行 ip 地址的匹配，非常适合对批量ip地址进行匹配分流。
 
 这时就体现出 ``dnsmasq`` 的价值了，``dnsmasq`` 可以通过配置实现，不同域名走不同的上游 dns 服务进行查询，
@@ -79,17 +79,17 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
 
 利用 ``dnsmasq`` 的这个特性可以实现对域名进行分流：
 
-1. 需要直连的域名，``dnsmasq`` 走 国内dns 查询服务即可，并且写入到 ipset 白名单里。
-2. 需要302跳转的域名，``dnsmasq`` 走 国际dns（或者 clash 提供的dns服务） 查询服务即可，并且写入到 ipset 302 名单里。
-3. 需要代理的域名，``dnsmasq`` 走 国际dns（或者 clash 提供的dns服务） 查询服务即可，并且写入到 ipset 代理名单里。
+1. 需要直连的域名，``dnsmasq`` 走国内dns 查询服务即可，并把解析到的 ip 地址写入到 ``ipset`` 白名单里。
+2. 需要302跳转的域名，``dnsmasq`` 走国际dns（或者 ``clash`` 提供的dns服务） 查询服务即可，并把解析到的 ip 地址写入到 ``ipset`` 302 名单里。
+3. 需要代理的域名，``dnsmasq`` 走 国际dns（或者 ``clash`` 提供的dns服务） 查询服务即可，并把解析到的 ip 地址写入到 ``ipset`` 代理名单里。
 
-然后配置 ``iptables`` 规则，不同 ipset 名单转发到对应的服务即可。
+然后配置 ``iptables`` 规则，实现不同 ``ipset`` 名单转发到对应的服务即可。
 
 
 ``Shadowsocks for Asuswrt-Merlin New Gen``  项目本身也是这样做的，
 我们只需要稍加修改，加入需要 302跳转 的分组即可。
 
-1. 在 ``rules/`` 目录下，增加一个名为 ``user_302_redirect.txt`` 文件，里面写入需要 302 调整的 xbox 下载域名
+1. 在 ``rules/`` 目录下，增加一个名为 ``user_302_redirect.txt`` 文件，里面写入需要 302 跳转的 ``xbox`` 下载域名
 
   ```txt
   assets1.xboxlive.com
@@ -114,7 +114,10 @@ For server side set up, you can easily install shadowsocks server and v2ray-plug
         # 注意，这里的作用是，告知 dnsmasq ，此名单里的域名解析得到的 ip 加入到名字为 user302list 的 ipset 集合 
         # 在 iptables 规则里会把这个集合里的数据包强制转发发到 lighttpd 服务
         echo "ipset=/${i}/user302list" >> ${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
-
+        # 为避免这部分域名被 dns 污染，可以指定这部分域名使用安全的 dns 解析
+        # 这里 ${safe_dns_ip} 是一个安全的、国外的 dns服务，这里我用的 clash 提供的dns服务
+        # 变量 ${safe_dns_ip} 的配置在文件 etc/ss-merlin.conf 里面
+        echo "server=/${i}/${safe_dns_ip}" >>${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
       done
     fi
 ```
