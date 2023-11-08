@@ -3,23 +3,31 @@
 SS_MERLIN_HOME=/opt/share/ss-merlin
 SHADOW_CONFIG_FILE=${SS_MERLIN_HOME}/etc/shadowsocks/config.json
 
+# 设定一个变量，指定是 clash 还是 ss-redir 。
+# 不过没实际意义，改动的地方很多，没办法兼容  ss-redir  了
+
 PROXY_PROC="clash" # ss-redir 
 CLASH_HOME=${SS_MERLIN_HOME}/clash/
 CLASH_CONFIG_HOME=${SS_MERLIN_HOME}/etc/clash/
+CLASH_SERVICE="/opt/etc/init.d/S90clash"
 
 start_proxy(){
 
   if [[ "${PROXY_PROC}" == 'ss-redir' ]]; then
     ss-redir -c ${SHADOW_CONFIG_FILE} -f /opt/var/run/ss-redir.pid
   else
-    /opt/etc/init.d/S90clash start
-    # clash -d ${CLASH_CONFIG_HOME} 
+    if [[ ! -f ${CLASH_SERVICE} ]]; then
+      cp ${SS_MERLIN_HOME}/bin/S90clash ${CLASH_SERVICE}
+
+    fi
+    # 启动 clash 服务
+    ${CLASH_SERVICE} start
   fi
 
 }
 
 kill_proxy(){
-  /opt/etc/init.d/S90clash stop
+  ${CLASH_SERVICE} stop 2>/dev/null
   killall ${PROXY_PROC} 2>/dev/null
 }
 

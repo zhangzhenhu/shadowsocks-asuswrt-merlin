@@ -1,6 +1,127 @@
 # Shadowsocks for Asuswrt-Merlin New Gen
 
 
+shadowsocks-asuswrt-merlin will install `shadowsocks-libev` and `v2ray-plugin` on your Asuswrt-Merlin New Gen(version 382.xx and higher) based router, tested on NETGEAR R7000 and ASUS RT-AC86U.
+
+For server side set up, you can easily install shadowsocks server and v2ray-plugin with docker by [https://github.com/Acris/docker-shadowsocks-libev](https://github.com/Acris/docker-shadowsocks-libev).
+
+## 变更说明
+
+关键词： xbox,华硕,代理,clash,加速
+
+本项目基于 ``Shadowsocks for Asuswrt-Merlin New Gen`` 修改而来。
+
+### 背景说明
+
+最近 ``xbox`` 总抽风，所以想着给他加个代理，但是 xbox 本身不支持配置代理，只能想办法在路由器上加一个透明代理。
+但是如果把 ``xbox`` 全部请求都走代理，游戏下载速度会超级慢。
+参考学习了 ``xbox`` 下载助手（https://github.com/skydevil88/XboxDownload/blob/master/README_OpenWrt.md）
+的知识，部分游戏下载链接可以利用302跳转到国内站，其它 xbox 地址的走代理。
+这样就两全其美了，但是要实现起来比较麻烦。
+
+我的路由器是华硕路由器，并且刷了原版梅林（merlin）固件，因为不太信任国内团队搞得改版梅林，所以还是用的原版梅林。
+原版梅林安装插件就比较麻烦了，找了很久后选中了 ``Shadowsocks for Asuswrt-Merlin New Gen`` 这个项目。
+
+
+
+但这个项目也有一点不足，就是它用的 ``Shadowsocks ss-redir`` 做透明代理服务，
+使用 ``ss-redir`` 会有几个不足：
+
+1. ``ss-redir`` 只能传入一个代理地址，不能传入多个并自己选择最优的。
+2. ``ss-redir`` 只能提供透明代理，不能同时提供 http 代理和 sockets 代理，这很不方便，不能很好的和 ``lighttpd`` 做配合。
+   ``lighttpd`` 需要依赖一个 http 代理，之后会讲到为什么。
+
+鉴于以上，想把 ``ss-redir`` 替换成功能更强大的 ``clash``。
+
+
+整理一下需求：
+
+1. 能对部分 ``xbox`` 下载链接进行302跳转。
+2. 把 ``ss-redir`` 替换成功能更强大的 ``clash``。
+
+
+我们的主要需求是对部分 ``xbox`` 下载链接进行302跳转，
+然而，无论 ``ss-redir`` 还是 ``clash`` 都不能做 302 跳转。
+所以又找到 ``lighttpd``,利用 ``lighttpd`` 做302跳转。
+
+但并不是 ``xbox`` 的全部链接都要 302 跳转，
+那些不需要跳转的的链接还得转回到代理才行，
+``lighttpd`` 有个插件可以转发流量到代理服务，
+但这个插件只支持 ``http`` 代理，因此还得需要一个 ``http`` 代理服务，
+这时就体现出 ``clash`` 功能丰富了，``clash``
+可以同时提供 透明代理、sockets代理、http代理，
+因此最好用 ``clash`` 替换掉 ``ss-redir``。
+
+
+大概的方案：
+
+1. 路由器利用 dnsmasq 进行dns解析，并且自动写相应的 ipset。为什么要用 dnsmasq 下面会讲。
+2. 利用 iptables 进行流量分流
+  1. 需要 302 跳转的 xbox 下载链接的域名流量，直接转发到 ``lighttpd``。
+  2. 需要走透明代理的的流量，转发到 ``clash``。
+  3. 其它的直连。
+
+3. 需要 302 跳转的域名流量被转到 ``lighttpd``， ``lighttpd`` 根据正则规则进行 302 调整。
+   命中调整规则的直接返回 302 给 ``xbox`` 了 ，没有命中的，转发给 ``clash`` 提供的 http代理服务。
+4. 
+
+
+### dnsmasq
+ 
+我们知道， ``clash`` 也可以分流，但是  ``clash`` 是分走代理还是直连，不能分流给 ``lighttpd``。
+所以我们还得选择用 ``iptables`` 进行分流。
+
+``iptables`` 分流只能按照 ip 分流，不能安装域名分流，但 ``iptables`` 可以和 ``ipset`` 配合使用，
+利用 ``ipset`` 进行 ip 地址的匹配，非常适合对批量ip地址进行匹配分流。
+
+这时就体现出 ``dnsmasq`` 的价值了，``dnsmasq`` 可以通过配置实现，不同域名走不同的上游 dns 服务进行查询，
+并写入到指定的 ``ipset`` 集合里。
+
+利用 ``dnsmasq`` 的这个特性可以实现对域名进行分流：
+
+1. 需要直连的域名，``dnsmasq`` 走 国内dns 查询服务即可，并且写入到 ipset 白名单里。
+2. 需要302跳转的域名，``dnsmasq`` 走 国际dns（或者 clash 提供的dns服务） 查询服务即可，并且写入到 ipset 302 名单里。
+3. 需要代理的域名，``dnsmasq`` 走 国际dns（或者 clash 提供的dns服务） 查询服务即可，并且写入到 ipset 代理名单里。
+
+然后配置 ``iptables`` 规则，不同 ipset 名单转发到对应的服务即可。
+
+
+``Shadowsocks for Asuswrt-Merlin New Gen``  项目本身也是这样做的，
+我们只需要稍加修改，加入需要 302跳转 的分组即可。
+
+1. 在 ``rules/`` 目录下，增加一个名为 ``user_302_redirect.txt`` 文件，里面写入需要 302 调整的 xbox 下载域名
+
+  ```txt
+  assets1.xboxlive.com
+  assets2.xboxlive.com
+  d1.xboxlive.com
+  d2.xboxlive.com
+  xvcf1.xboxlive.com
+  xvcf2.xboxlive.com
+  dlassets.xboxlive.com
+  dlassets2.xboxlive.com
+  ```
+
+2. 修改 ``bin/ss-merlin`` 文件，加入对 ``user_302_redirect.txt``  处理
+
+```sh
+    # 需要跳转到 lighttpd 的域名
+    user_domain_name_302list=${SS_MERLIN_HOME}/rules/user_302_redirect.txt
+
+    if [[ -f ${user_domain_name_302list} ]]; then
+      for i in $(cat ${user_domain_name_302list} | grep -v '^#'); do
+        # 写到 user-gfwlist-domains.conf 这个文件， 就不用再创建新的文件了
+        # 注意，这里的作用是，告知 dnsmasq ，此名单里的域名解析得到的 ip 加入到名字为 user302list 的 ipset 集合 
+        # 在 iptables 规则里会把这个集合里的数据包强制转发发到 lighttpd 服务
+        echo "ipset=/${i}/user302list" >> ${DNSMASQ_CONFIG_DIR}/user-gfwlist-domains.conf
+
+      done
+    fi
+```
+
+
+### lighttpd 的安装与配置
+
 部分站点跳转到 lighttpd ，然后由 lighttpd 进行302跳转
 
 ```sh
@@ -32,7 +153,8 @@ $HTTP["host"] =~ "^(dlassets|dlassets2)\.xboxlive\.com$" {
 
 ```
 
-在文件 `/opt/etc/lighttpd/conf.d/30-proxy.conf` 增加以下内容
+在文件 `/opt/etc/lighttpd/conf.d/30-proxy.conf` 增加以下内容，
+这里 ``7890`` 是 ``clash`` 的 http 代理服务端口。
 
 ```
 server.modules += ( "mod_proxy" )
@@ -40,11 +162,30 @@ proxy.server = ( "" => (( "host" => "127.0.0.1", "port" => 7890    )))
 
 ```
 
+### clash 的安装与配置
+
+clash 的默认安装目录在 ``${SS_MERLIN_HOME}/clash`` ,
+你需要把 clash 的配置文件放到这个目录下。
+
+如果你想更换 clash 的配置文件位置，你需要手动改一下文件 ``bin/S90clash``。
 
 
-shadowsocks-asuswrt-merlin will install `shadowsocks-libev` and `v2ray-plugin` on your Asuswrt-Merlin New Gen(version 382.xx and higher) based router, tested on NETGEAR R7000 and ASUS RT-AC86U.
+需要改动文件:
 
-For server side set up, you can easily install shadowsocks server and v2ray-plugin with docker by [https://github.com/Acris/docker-shadowsocks-libev](https://github.com/Acris/docker-shadowsocks-libev).
+1. ``bin/S90clash``
+2.  ``scripts/start_all_services.sh.sh``
+3.  ``scripts/stop_all_services.sh``
+
+
+### iptables 规则配置
+
+直接看文件 ``scripts/apply_iptables_rule.sh``
+
+我去掉了对 路由器 本身流量进行透明代理的功能，
+首先，这个功能没有太完美的处理方式，经常容易出错，造成困扰。
+其次，感觉这个就是伪需求，路由器 本身流量
+
+
 
 ## Getting Started
 

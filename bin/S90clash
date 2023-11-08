@@ -1,7 +1,10 @@
 #!/bin/sh
 
 ENABLED=yes
+# clash 的命令，如果找到不 clash，或者你想指定clash，需要把这个变量改成你指定的 clash 执行文件
 PROCS=clash
+# clash 的启动参数
+# 如果要自定义启动参数，需要修改这里。
 ARGS="-d /opt/share/ss-merlin/clash"
 PREARGS=""
 DESC=$PROCS
